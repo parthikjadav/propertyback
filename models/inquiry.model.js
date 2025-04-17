@@ -1,6 +1,6 @@
 const { default: mongoose } = require("mongoose")
 
-const inquireySchema = new mongoose.Schema({
+const inquirySchema = new mongoose.Schema({
     from: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
@@ -20,8 +20,8 @@ const inquireySchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-},{timestamps:true})
+}, { timestamps: true })
 
-const Inquirey = mongoose.model("Inquirey", inquireySchema)
+const Inquiry = mongoose.model("Inquiry", inquirySchema)
 
-module.exports = Inquirey
+module.exports = Inquiry

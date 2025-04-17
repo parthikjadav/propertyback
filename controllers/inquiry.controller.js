@@ -1,15 +1,15 @@
-const Inquirey = require("../models/inquirey.model");
+const Inquiry = require("../models/inquiry.model");
 const Property = require("../models/property.model");
 const { isInvalidObjectIds } = require("../utils")
 
-const inquireyController = {
+const inquiryController = {
     sendMessage: async (req, res) => {
         try {
             const { from, to, propertyId, message } = req.body
             if (isInvalidObjectIds([from, to, propertyId])) {
                 return res.status(400).json({ message: "invalid ids" })
             }
-            const newMsg = await Inquirey.create({
+            const newMsg = await Inquiry.create({
                 propertyId,
                 from,
                 to,
@@ -39,11 +39,7 @@ const inquireyController = {
                 return res.status(400).json({ message: "property not found" })
             }
 
-            const { ownerId } = property
-            console.log(ownerId, 'owner id');
-
-            const chat = await Inquirey.find({ $or: [{ from, to }, { from: to, to: from }] }).populate("from").populate("to").populate("propertyId")
-            console.log(chat, 'chat');
+            const chat = await Inquiry.find({ $or: [{ from, to }, { from: to, to: from }] }).populate("from").populate("to").populate("propertyId")
 
             if (chat.length <= 0) {
                 return res.status(400).json({ message: "chat not found" })
@@ -58,59 +54,47 @@ const inquireyController = {
         try {
             const { id } = req.params
             const { message } = req.body
+            if (isInvalidObjectIds([id])) throw new Error("invalid object id")
 
-            if (isInvalidObjectIds([id])) {
-                return res.status(400).json({ message: "invalid object id" })
-            }
+            if (req.user.role !== 'admin') {
+                const message = await Inquiry.findById(id)
 
-            if(req.user.role!=='admin'){
-                const message = await Inquirey.findById(id)
-
-                if(message.from!==req.user._id){
+                if (message.from !== req.user._id) {
                     return res.status(400).json({ message: "you does not have permission to update this message" })
                 }
             }
 
-            const updatedMessage = await Inquirey.findByIdAndUpdate(id,{
+            const updatedMessage = await Inquiry.findByIdAndUpdate(id, {
                 message
-            },{new:true})
+            }, { new: true })
 
-            if (!updatedMessage) {
-                return res.status(400).json({ message: "failed to update message" })
-            }
+            if (!updatedMessage) throw new Error("failed to update message")
 
-            res.status(200).json({message: "message updated successfully",data:updatedMessage.message})
+            res.status(200).json({ message: "message updated successfully", data: updatedMessage.message })
         } catch (error) {
             res.status(500).json({ message: error.message })
         }
     },
-    deleteMessage: async (req,res) =>{
+    deleteMessage: async (req, res) => {
         try {
-            const {id} = req.params
-            if (isInvalidObjectIds([id])) {
-                return res.status(400).json({ message: "invalid object id" })
+            const { id } = req.params
+            if (isInvalidObjectIds([id])) throw new Error("invalid object id")
+
+            if (req.user.role !== 'admin') {
+                const message = await Inquiry.findById(id)
+
+                if (message.from !== req.user._id) throw new Error("you does not have permission to update this message")
             }
 
-            if(req.user.role!=='admin'){
-                const message = await Inquirey.findById(id)
+            const deletedMessage = await Inquiry.findByIdAndUpdate(id)
 
-                if(message.from!==req.user._id){
-                    return res.status(400).json({ message: "you does not have permission to update this message" })
-                }
-            }
+            if (!deletedMessage) throw new Error("failed to delete message")
 
-            const deletedMessage = await Inquirey.findByIdAndUpdate(id)
-
-            if (!deletedMessage) {
-                return res.status(400).json({ message: "failed to delete message" })
-            }
-
-            res.status(200).json({message: "message deleted successfully"})
-
+            res.status(200).json({ message: "message deleted successfully" })
         } catch (error) {
             res.status(500).json({ message: error.message })
         }
     }
 }
 
-module.exports = inquireyController
+module.exports = inquiryController

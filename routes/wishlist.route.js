@@ -1,11 +1,11 @@
 const express = require("express");
 const { authenticate } = require("../auth");
 const wishlistController = require("../controllers/wishlist.controller");
-const { valiate, wishlistSchema } = require("../validation");
+const { validate, wishlistSchema } = require("../validation");
 const route = express.Router()
 
-route.get("/",authenticate,wishlistController.getWhishlists)
-route.post("/",authenticate,valiate(wishlistSchema),wishlistController.addToWishlist)
-route.delete("/:id",authenticate,wishlistController.deleteWishlist)
+route.get("/", wishlistController.getWishlists)
+route.post("/", validate(wishlistSchema), wishlistController.addToWishlist)
+route.delete("/:id", wishlistController.deleteWishlist)
 
 module.exports = route

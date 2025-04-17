@@ -2,7 +2,7 @@ const { z } = require("zod")
 const { ROLES } = require("../constants")
 
 const zodValidation = {
-      valiate: (schema) => (req, res, next) => {
+      validate: (schema) => (req, res, next) => {
             const data = schema.safeParse(req.body)
             if (data.success) {
                   next()
@@ -11,14 +11,14 @@ const zodValidation = {
             }
       },
       userSignUpSchema: z.object({
-            username: z.string().min(2, "username must be 2 charachter long"),
-            password: z.string().min(6, "password must be 6 charachter long"),
+            username: z.string().min(2, "username must be 2 character long"),
+            password: z.string().min(6, "password must be 6 character long"),
             email: z.string().email().min(2, "email must be valid"),
-            role: z.enum(ROLES).optional().default('user'),
+            role: z.enum([ROLES.ADMIN,ROLES.USER,ROLES.OWNER]).optional().default('user'),
       }),
       userSignInSchema: z.object({
             email: z.string().email().min(2, "email must be valid"),
-            password: z.string().min(6, "password must be 6 charachter long"),
+            password: z.string().min(6, "password must be 6 character long"),
       }),
       propertySchema: z.object({
             ownerId: z.string().min(2, "owner id is required"),
@@ -37,7 +37,7 @@ const zodValidation = {
                   return val
             }, z.number().min(100, "price must be greater then 100 "))
       }),
-      visiblitySchema:z.object({
+      visibilitySchema:z.object({
             id: z.string().min(2,"id is required"),
             active: z.boolean()
       }),
@@ -45,7 +45,7 @@ const zodValidation = {
             username: z.string().optional(),
             email: z.string().email().optional()
       }).refine((data)=> data.username || data.email,{
-         message: "atleast on of the field username or email is required"
+         message: "at least on of the field username or email is required"
       }),
       updatePropertySchema: z.object({
             ownerId: z.string().min(2, "owner id is required").optional(),

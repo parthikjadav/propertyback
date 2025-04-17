@@ -10,7 +10,7 @@ const storage = multer.diskStorage({
     }
 });
 
-const removefileIfExists = (path) => {
+const removeFileIfExists = (path) => {
     fs.stat(path, function (err, stats) {
         if (err) {
             return console.error(err);
@@ -24,4 +24,4 @@ const removefileIfExists = (path) => {
 
 const upload = multer({ storage })
 
-module.exports = {upload,removefileIfExists}
+module.exports = {upload,removeFileIfExists}

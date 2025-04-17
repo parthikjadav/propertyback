@@ -11,9 +11,7 @@ const authController = {
 
         const isUserAlreadyExists = await User.findOne({ email })
 
-        if (isUserAlreadyExists) {
-            return res.status(400).json({ message: "user already exist with this email" })
-        }
+        if (isUserAlreadyExists) throw new Error("user already exist with this email")
 
         const hashedPassword = await bcrypt.hash(password, 10)
 
@@ -23,14 +21,13 @@ const authController = {
             password: hashedPassword,
             role
         })
-
-        if (!user) {
-            return res.status(400).json({ message: "error creating user" })
-        }
+    
+        if (!user) throw new Error("error creating user")
+    
         await sendToken(user._id, res)
         sendOtpMail(user)
         user.password = ''
-        res.status(201).json({ message: "user signed up succsessfully", user })
+        res.status(201).json({ message: "user signed up successfully", user })
     }),
     signOut: expressAsyncHandler((req, res) => {
         res.clearCookie('token').status(200).json({ message: "successfully logged out" })
@@ -40,19 +37,15 @@ const authController = {
 
         const user = await User.findOne({ email })
 
-        if (!user) {
-            return res.status(400).json({ message: "user does not exists" })
-        }
+        if (!user) throw new Error("user not found")
 
         const isPasswordCorrect = await bcrypt.compare(password, user.password)
 
-        if (!isPasswordCorrect) {
-            return res.status(400).json({ message: "password is incorrect" })
-        }
-
+        if (!isPasswordCorrect) throw new Error("password is incorrect")
+        
         await sendToken(user._id, res)
         user.password = ''
-        res.status(200).json({ message: "user signed in succsessfully", user })
+        res.status(200).json({ message: "user signed in successfully", user })
     }),
 }
 

@@ -1,6 +1,6 @@
 const nodemailer = require("nodemailer");
 const Otp = require("../models/otp.model");
-const tamplate = require("./email.tamplate");
+const template = require("./email.template");
 
 const transporter = nodemailer.createTransport({
     service: "Gmail",
@@ -30,7 +30,7 @@ const sendOtpMail =async (user) => {
         from: process.env.APP_EMAIL,
         to: user.email,
         subject: "Otp for verification",
-        html: tamplate(newOtp.otp),
+        html: template(newOtp.otp),
     }
     transporter.sendMail(options, (error, info) => {
         if (error) {

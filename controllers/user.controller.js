@@ -11,18 +11,63 @@ const userController = {
     }),
     getAllUsers: expressAsyncHandler(async (req, res) => {
         try {
-            console.log("called");
+            let {
+                search = "",
+                emailVerified,
+                sortBy = "asc",
+                sortByCreatedAt = "asc",
+                page = 1,
+                limit = 10
+            } = req.query;
 
-            const users = await User.find().select("-password")
+            // Convert values
+            page = parseInt(page);
+            limit = parseInt(limit);
+            const sortOrder = sortBy.toLowerCase() === 'desc' ? -1 : 1;
+            const createdAtOrder = sortByCreatedAt.toLowerCase() === 'desc' ? -1 : 1;
 
-            if (!users) {
-                res.status(400).json({ message: "no users found" })
+            const regex = new RegExp(search, 'i');
+
+            const filter = {
+                $or: [
+                    { username: { $regex: regex } },
+                    { email: { $regex: regex } },
+                    { role: { $regex: regex } }
+                ]
+            };
+
+            // Optional filter for emailVerified
+            if (emailVerified !== undefined) {
+                filter.emailVerified = emailVerified === 'true';
             }
-            console.log(users, "user");
 
-            res.status(200).json({ message: "user get successfully", users })
+            const skip = (page - 1) * limit;
+
+            const [users, totalCount] = await Promise.all([
+                User.find(filter)
+                    .sort({ username: sortOrder, createdAt: createdAtOrder })
+                    .skip(skip)
+                    .limit(limit)
+                    .select("-password"),
+                User.countDocuments(filter)
+            ]);
+
+            if (users.length === 0) {
+                return res.status(404).json({ message: "No users found" });
+            }
+
+            const totalPages = Math.ceil(totalCount / limit);
+
+            res.status(200).json({
+                message: "Users fetched successfully",
+                page,
+                limit,
+                totalCount,
+                totalPages,
+                users
+            });
         } catch (error) {
-            res.status(500).json({ message: error.message })
+            res.status(400).json({ message: error.message });
         }
     }),
     sendEmailOtp: expressAsyncHandler(async (req, res) => {
@@ -35,7 +80,7 @@ const userController = {
         const { _id: userId } = req.user
 
         if (req.user.emailVerified) {
-            return res.status(400).json({ message: 'email is already varifyed' })
+            return res.status(400).json({ message: 'email is already verified' })
         }
 
         if (!otp) {
@@ -46,12 +91,12 @@ const userController = {
 
         if (!userOtp) {
             sendOtpMail(req.user)
-            return res.status(400).json({ message: 'otp is not valide new otp is sent to your email' })
+            return res.status(400).json({ message: 'otp is not valid new otp is sent to your email' })
         }
 
-        let minuts = new Date().getMinutes() - new Date(userOtp.createdAt).getMinutes()
+        let minuets = new Date().getMinutes() - new Date(userOtp.createdAt).getMinutes()
 
-        if (minuts > 5) {
+        if (minuets > 5) {
             sendOtpMail(req.user)
             return res.status(400).json({ message: 'otp is expired new otp is sent to your email' })
         }
@@ -67,13 +112,11 @@ const userController = {
         await Otp.findByIdAndDelete(userOtp._id)
 
         if (verifyEmail.emailVerified) {
-            return res.status(200).json({ message: 'Email Varified Successfully' })
+            return res.status(200).json({ message: 'Email Verified Successfully' })
         }
     }),
     getUserById: expressAsyncHandler(async (req, res) => {
         try {
-            console.log("called");
-
             const { id } = req.params
             if (isInvalidObjectIds([id])) {
                 return res.status(400).json({ message: "Invalid user ID" })
@@ -109,18 +152,18 @@ const userController = {
             res.status(500).json({ message: error.message })
         }
     },
-    deleteUser: async (req,res)=>{
+    deleteUser: async (req, res) => {
         try {
             const { id } = req.params
             if (isInvalidObjectIds([id])) {
                 return res.status(400).json({ message: "Invalid user ID" })
             }
-            
+
             const user = await User.findByIdAndDelete(id)
-            if(!user){
+            if (!user) {
                 return res.status(400).json({ message: "failed to delete user" })
             }
-            
+
             return res.status(200).json({ message: "deleted user successfully" })
 
         } catch (error) {

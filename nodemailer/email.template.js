@@ -1,4 +1,4 @@
-const tamplate = (otp) => {
+const template = (otp) => {
    return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -25,4 +25,4 @@ const tamplate = (otp) => {
 </html>
 `
 }
-module.exports = tamplate
+module.exports = template

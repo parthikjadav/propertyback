@@ -1,8 +1,7 @@
 const expressAsyncHandler = require("express-async-handler")
 const uploadToCloudinary = require("../upload/cloudinary")
-const { removefileIfExists } = require("../upload/multer")
+const { removeFileIfExists } = require("../upload/multer")
 const Property = require("../models/property.model")
-const { default: mongoose } = require("mongoose")
 const { isInvalidObjectIds } = require("../utils")
 
 const propertyController = {
@@ -11,16 +10,16 @@ const propertyController = {
             return res.status(400).json({ message: "image is required" })
         }
         const { ownerId, title, description, location, address, price } = req.body
-        const cloudeImage = await uploadToCloudinary(req.file.path)
-        if (!cloudeImage) {
+        const cloudImage = await uploadToCloudinary(req.file.path)
+        if (!cloudImage) {
             return res.status(400).json({ message: "failed to upload image" })
         }
-        removefileIfExists(req.file.path)
+        removeFileIfExists(req.file.path)
         const property = await Property.create({
             ownerId,
             title,
             description,
-            image: cloudeImage.url,
+            image: cloudImage.url,
             location,
             address,
             price
@@ -43,19 +42,20 @@ const propertyController = {
         if (!property) {
             return res.status(400).json({ message: "id is invalid property not found" })
         }
-
-        const isOwner = req.user._id.toString() === property.ownerId.toString()
-        if (!isOwner) {
-            return res.status(400).json({ message: "you does not have permission to update the property" })
+        if (req.user.role !== 'admin') {
+            const isOwner = req.user._id.toString() === property.ownerId.toString()
+            if (!isOwner) {
+                return res.status(400).json({ message: "you does not have permission to update the property" })
+            }
         }
-        let cloudeImage;
+        let cloudImage;
         if (req.file) {
-            cloudeImage = await uploadToCloudinary(req.file.path)
-            if (!cloudeImage) {
+            cloudImage = await uploadToCloudinary(req.file.path)
+            if (!cloudImage) {
                 return res.status(400).json({ message: "failed to upload image" })
             }
-            removefileIfExists(req.file.path)
-            req.body.image = cloudeImage.url
+            removeFileIfExists(req.file.path)
+            req.body.image = cloudImage.url
         }
 
         const newProperty = await Property.findByIdAndUpdate(id, {
@@ -64,7 +64,7 @@ const propertyController = {
             price,
             location,
             address,
-            image: cloudeImage ? cloudeImage.url : undefined
+            image: cloudImage ? cloudImage.url : undefined
         }, { new: true })
 
         if (!newProperty) {
@@ -84,12 +84,12 @@ const propertyController = {
         if (!property) {
             return res.status(400).json({ message: "id is invalid property not found" })
         }
-
-        const isOwner = req.user._id.toString() === property.ownerId.toString()
-        if (!isOwner) {
-            return res.status(400).json({ message: "you does not have permission to update the property" })
+        if (req.user.role !== 'admin') {
+            const isOwner = req.user._id.toString() === property.ownerId.toString()
+            if (!isOwner) {
+                return res.status(400).json({ message: "you does not have permission to update the property" })
+            }
         }
-
         const deletedProperty = await Property.findByIdAndDelete(id)
         if (!deletedProperty) {
             return res.status(400).json({ message: "failed to delete property" })
@@ -99,42 +99,45 @@ const propertyController = {
     }),
     getAllProperties: expressAsyncHandler(async (req, res) => {
         try {
-            const { role, _id } = req.user
-            const { page, limit } = req.query
-            const options = {
-                page: page || 1,
-                limit: limit || 10,
-                customLabels: {},
+            let { page = 1, limit = 10, search = "", sortBy = "asc" } = req.query;
+
+            page = parseInt(page);
+            limit = parseInt(limit);
+
+            const sortOrder = sortBy.toLowerCase() === "desc" ? -1 : 1;
+
+            const regex = new RegExp(search, "i");
+
+            const filter = {
+                $or: [
+                    { title: { $regex: regex } },
+                    { description: { $regex: regex } },
+                    { address: { $regex: regex } }
+                ]
             };
-            let paginatedResult;
-            await Property.paginate({}, options, function (err, result) {
-                if (err) {
-                    res.status(500).json({ message: "error generating pagination" })
-                }
-                paginatedResult = result
-            })
-            if (paginatedResult.docs.length <= 0) {
-                return res.status(400).json({ message: "docs not found ", paginatedResult })
+
+            const startIndex = (page - 1) * limit;
+
+            const [properties, totalCount] = await Promise.all([
+                Property.find(filter).skip(startIndex).limit(limit).sort({ title: sortOrder }).populate("ownerId"),
+                Property.countDocuments(filter)
+            ]);
+
+            const totalPages = Math.ceil(totalCount / limit);
+
+            if (!properties.length) {
+                return res.status(404).json({ message: "No properties found" });
             }
-            if (role === "owner") {
-                console.log(paginatedResult,"res");
-                
-                const filteredResult = paginatedResult.docs.filter((val) => {
-                    return val.ownerId.toString() === _id.toString()
-                })
-                console.log(filteredResult,'filter');
-                
-                if (filteredResult.length <= 0) {
-                    return res.status(400).json({ message: "no propertys found" })
-                }
-                paginatedResult.docs = filteredResult
-                return res.status(200).json({ message: "successfully fetched all propertys of owner", paginatedResult })
-            }
-            if (role === "admin") {
-                return res.status(200).json({ message: "successfully fetched all propertys by admin", paginatedResult })
-            }
+            
+            res.status(200).json({
+                page,
+                limit,
+                totalPages,
+                totalCount,
+                properties
+            });
         } catch (error) {
-            return res.status(400).json({ message: error.message })
+            return res.status(400).json({ message: error.message });
         }
     }),
     getPropertyById: expressAsyncHandler(async (req, res) => {
@@ -166,7 +169,7 @@ const propertyController = {
             return res.status(500).json({ message: "failed to fetch property" })
         }
     }),
-    changeVisiblity: expressAsyncHandler(async (req, res) => {
+    changeVisibility: expressAsyncHandler(async (req, res) => {
         try {
             const { active, id } = req.body
 
@@ -178,21 +181,21 @@ const propertyController = {
             if (!property) {
                 return res.status(400).json({ message: "id is invalid property not found" })
             }
-
-            const isOwner = req.user._id.toString() === property.ownerId.toString()
-            if (!isOwner) {
-                return res.status(400).json({ message: "you does not have permission to update the property" })
+            if (req.user.role !== 'admin') {
+                const isOwner = req.user._id.toString() === property.ownerId.toString()
+                if (!isOwner) {
+                    return res.status(400).json({ message: "you does not have permission to update the property" })
+                }
             }
-
             const resProperty = await Property.findByIdAndUpdate(id, {
                 active
             }, { new: true })
 
             if (!resProperty) {
-                return res.status(400).json({ message: "failed to update visiblity" })
+                return res.status(400).json({ message: "failed to update visibility" })
             }
 
-            res.status(200).json({ message: "updated visiblity successfully", resProperty })
+            res.status(200).json({ message: "updated visibility successfully", resProperty })
 
         } catch (error) {
             return res.status(400).json({ message: error.message })
