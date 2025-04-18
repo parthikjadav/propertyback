@@ -99,7 +99,7 @@ const propertyController = {
     }),
     getAllProperties: expressAsyncHandler(async (req, res) => {
         try {
-            let { page = 1, limit = 10, search = "", sortBy = "asc" } = req.query;
+            let { page = 1, limit = 10, search = "", sortBy = "asc", priceMin = 0, priceMax = Infinity } = req.query;
 
             page = parseInt(page);
             limit = parseInt(limit);
@@ -113,7 +113,8 @@ const propertyController = {
                     { title: { $regex: regex } },
                     { description: { $regex: regex } },
                     { address: { $regex: regex } }
-                ]
+                ],
+                price: { $gte: priceMin, $lte: priceMax }
             };
 
             const startIndex = (page - 1) * limit;
@@ -128,7 +129,7 @@ const propertyController = {
             if (!properties.length) {
                 return res.status(404).json({ message: "No properties found" });
             }
-            
+
             res.status(200).json({
                 page,
                 limit,
@@ -199,6 +200,54 @@ const propertyController = {
 
         } catch (error) {
             return res.status(400).json({ message: error.message })
+        }
+    }),
+    getAllPropertiesOfOwner: expressAsyncHandler(async (req, res) => {
+        try {
+            let { page = 1, limit = 10, search = "", sortBy = "asc", priceMin = 0, priceMax = Infinity } = req.query;
+            let { _id } = req.user
+            page = parseInt(page);
+            limit = parseInt(limit);
+
+            const sortOrder = sortBy.toLowerCase() === "desc" ? -1 : 1;
+
+            const regex = new RegExp(search, "i");
+            
+            let filter = {
+                $or: [
+                    { title: { $regex: regex } },
+                    { description: { $regex: regex } },
+                    { address: { $regex: regex } }
+                ],
+                price: { $gte: priceMin, $lte: priceMax }
+            };
+
+            if(req.user.role === 'owner'){
+                filter.ownerId = _id.toString() 
+            }
+
+            const startIndex = (page - 1) * limit;
+
+            const [properties, totalCount] = await Promise.all([
+                Property.find(filter).skip(startIndex).limit(limit).sort({ title: sortOrder }).populate("ownerId"),
+                Property.countDocuments(filter)
+            ]);
+
+            const totalPages = Math.ceil(totalCount / limit);
+
+            if (!properties.length) {
+                return res.status(404).json({ message: "No properties found" });
+            }
+
+            res.status(200).json({
+                page,
+                limit,
+                totalPages,
+                totalCount,
+                properties
+            });
+        } catch (error) {
+            return res.status(400).json({ message: error.message });
         }
     })
 }

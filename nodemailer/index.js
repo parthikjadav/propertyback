@@ -1,6 +1,9 @@
 const nodemailer = require("nodemailer");
 const Otp = require("../models/otp.model");
-const template = require("./email.template");
+const template = require("./otp.email.template");
+const resetPasswordTemplate = require("./reset.email.template");
+
+const APP_EMAIL = process.env.APP_EMAIL
 
 const transporter = nodemailer.createTransport({
     service: "Gmail",
@@ -8,12 +11,12 @@ const transporter = nodemailer.createTransport({
     port: 465,
     secure: true,
     auth: {
-        user: process.env.APP_EMAIL,
+        user: APP_EMAIL,
         pass: process.env.EMAIL_APP_PASSWORD,
     },
 })
 
-const sendOtpMail =async (user) => {
+const sendOtpMail = async (user) => {
     await Otp.deleteMany({ userId: user._id })
 
     const otp = 100000 + Math.floor(Math.random() * 900000)
@@ -27,7 +30,7 @@ const sendOtpMail =async (user) => {
     }
 
     const options = {
-        from: process.env.APP_EMAIL,
+        from: APP_EMAIL,
         to: user.email,
         subject: "Otp for verification",
         html: template(newOtp.otp),
@@ -41,4 +44,24 @@ const sendOtpMail =async (user) => {
     });
 };
 
-module.exports = sendOtpMail
+const sendEmailResetPassword = (email, link) => {
+    console.log(link,'link from email');
+    
+    const options = {
+        from: APP_EMAIL,
+        to: email,
+        subject: "reset your password",
+        html: resetPasswordTemplate(link),
+    }
+    transporter.sendMail(options, (error, info) => {
+        if (error) {
+            console.error("Error sending email: ", error);
+            return false
+        }
+        console.log("Email sent to: ",email, info.response);
+        return true
+    })
+    return true
+}
+
+module.exports = { sendOtpMail, sendEmailResetPassword }

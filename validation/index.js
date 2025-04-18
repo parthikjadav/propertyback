@@ -1,5 +1,6 @@
 const { z } = require("zod")
 const { ROLES } = require("../constants")
+const { verifyToken } = require("../auth")
 
 const zodValidation = {
       validate: (schema) => (req, res, next) => {
@@ -10,11 +11,16 @@ const zodValidation = {
                   res.status(400).json({ message: data.error.errors[0].path + ' ' + data.error.errors[0].message })
             }
       },
+      validateAsync: (schema) => async (req, res, next) => {
+            const data = await schema.parseAsync(req.body)
+            req.data = data
+            next()
+      },
       userSignUpSchema: z.object({
             username: z.string().min(2, "username must be 2 character long"),
             password: z.string().min(6, "password must be 6 character long"),
             email: z.string().email().min(2, "email must be valid"),
-            role: z.enum([ROLES.ADMIN,ROLES.USER,ROLES.OWNER]).optional().default('user'),
+            role: z.enum([ROLES.ADMIN, ROLES.USER, ROLES.OWNER]).optional().default('user'),
       }),
       userSignInSchema: z.object({
             email: z.string().email().min(2, "email must be valid"),
@@ -37,15 +43,15 @@ const zodValidation = {
                   return val
             }, z.number().min(100, "price must be greater then 100 "))
       }),
-      visibilitySchema:z.object({
-            id: z.string().min(2,"id is required"),
+      visibilitySchema: z.object({
+            id: z.string().min(2, "id is required"),
             active: z.boolean()
       }),
-      updateUserSchema:z.object({
+      updateUserSchema: z.object({
             username: z.string().optional(),
             email: z.string().email().optional()
-      }).refine((data)=> data.username || data.email,{
-         message: "at least on of the field username or email is required"
+      }).refine((data) => data.username || data.email, {
+            message: "at least on of the field username or email is required"
       }),
       updatePropertySchema: z.object({
             ownerId: z.string().min(2, "owner id is required").optional(),
@@ -60,17 +66,28 @@ const zodValidation = {
             price: z.number().min(100, "price must be greater then 100 ").optional()
       }),
       wishlistSchema: z.object({
-            userId: z.string().min(4,"user id is invalid"),
-            propertyId: z.string().min(4,"property id is invalid"),
+            userId: z.string().min(4, "user id is invalid"),
+            propertyId: z.string().min(4, "property id is invalid"),
       }),
       inquirySchema: z.object({
-           from: z.string().min(6,"from id is invalid"),
-           to: z.string().min(6,"to id is invalid"),
-           propertyId: z.string().min(6,"property id is invalid"),
-           message: z.string().min(1,'message is required'),
+            from: z.string().min(6, "from id is invalid"),
+            to: z.string().min(6, "to id is invalid"),
+            propertyId: z.string().min(6, "property id is invalid"),
+            message: z.string().min(1, 'message is required'),
       }),
       updateInquirySchema: z.object({
-            message: z.string().min(1,"message must be 1 character long")
+            message: z.string().min(1, "message must be 1 character long")
+      }),
+      resetPasswordSchema: z.object({
+            token: z.string().transform(async (val) => await verifyToken(val), {
+                  message: "Invalid JWT Token"
+            }),
+            password: z.string().refine((val) => {
+                  if (val.length >= 6) {
+                        return val
+                  }
+                  throw new Error("password must be longer then 5 character")
+            })
       })
 }
 

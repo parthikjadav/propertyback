@@ -6,7 +6,7 @@ const wishlistController = {
     getWishlists: async (req, res) => {
         try {
             const { _id } = req.user;
-            let { page = 1, limit = 10, search = '', sortBy = 'asc' } = req.query;
+            let { page = 1, limit = 10, search = '', sortBy = 'asc', priceMin = 0, priceMax = Infinity} = req.query;
     
             page = parseInt(page);
             limit = parseInt(limit);
@@ -29,7 +29,8 @@ const wishlistController = {
                             { title: { $regex: regex } },
                             { description: { $regex: regex } },
                             { address: { $regex: regex } }
-                        ]
+                        ],
+                        price: {$gte: priceMin,$lte: priceMax}
                     }
                 });
     

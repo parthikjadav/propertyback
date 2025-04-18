@@ -1,9 +1,11 @@
 const expressAsyncHandler = require("express-async-handler")
 const User = require("../models/user.model")
-const sendOtpMail = require("../nodemailer")
+const { sendOtpMail, sendEmailResetPassword } = require("../nodemailer")
 const Otp = require("../models/otp.model")
 const { default: mongoose } = require("mongoose")
+const bcrypt = require("bcrypt")
 const { isInvalidObjectIds } = require("../utils")
+const { createToken } = require("../auth")
 
 const userController = {
     getUser: expressAsyncHandler((req, res) => {
@@ -169,7 +171,38 @@ const userController = {
         } catch (error) {
             res.status(500).json({ message: error.message })
         }
-    }
+    },
+    sendResetPasswordEmail: expressAsyncHandler(async (req, res) => {
+        try {
+            const { _id, email } = req.user
+            const token = await createToken(_id)
+            const link = `${process.env.CLIENT_BASE_URL}/reset-password/?token=${token}`
+            console.log(link, process.env.CLIENT_BASE_URL);
+
+            const success = sendEmailResetPassword(email, link)
+            console.log(success);
+
+            if (!success) throw new Error("failed to send email")
+
+            res.status(200).json({ message: "reset password mail sent to : " + email })
+
+        } catch (error) {
+            res.status(500).json({ message: error.message })
+        }
+    }),
+    resetPassword: expressAsyncHandler(async (req, res) => {
+        try {
+            const { token: { id }, password } = req.data
+
+            const newHashedPassword = await bcrypt.hash(password, 10)
+            if (!newHashedPassword) throw new Error("failed to create hash")
+
+            const user = await User.findByIdAndUpdate(id, { password: newHashedPassword }, { new: true })
+            res.status(200).json({message:"user password updated successfully",user })
+        } catch (error) {
+            res.status(500).json({ message: error.message })
+        }
+    })
 }
 
 module.exports = userController
